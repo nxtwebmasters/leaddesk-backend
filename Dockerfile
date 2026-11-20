@@ -1,6 +1,9 @@
 # Build stage
 FROM node:20-alpine AS builder
 
+# Install OpenSSL and libc compatibility for Prisma
+RUN apk add --no-cache openssl libc6-compat
+
 WORKDIR /app
 
 COPY package*.json ./
@@ -15,6 +18,9 @@ RUN npm run build
 
 # Production stage
 FROM node:20-alpine AS runner
+
+# Install OpenSSL runtime for Prisma query engine in Alpine
+RUN apk add --no-cache openssl libc6-compat
 
 WORKDIR /app
 
