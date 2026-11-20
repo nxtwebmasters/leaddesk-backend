@@ -1,0 +1,390 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum TaskStatus {
+  INBOX
+  PLANNED
+  IN_PROGRESS
+  WAITING
+  COMPLETED
+  CANCELLED
+  ARCHIVED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskType {
+  TASK
+  DELEGATED
+  FOLLOW_UP
+  PERSONAL
+}
+
+enum InboxItemType {
+  TASK
+  NOTE
+  REMINDER
+  MEETING
+  DISCUSSION
+  IDEA
+  DECISION
+  FOLLOW_UP
+}
+
+enum InboxItemStatus {
+  NEW
+  PROCESSED
+  DISMISSED
+}
+
+enum FollowUpStatus {
+  OPEN
+  WAITING
+  COMPLETED
+  CANCELLED
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  DISMISSED
+}
+
+enum CalendarEventType {
+  MEETING
+  PERSONAL
+  TASK
+  REMINDER
+  OTHER
+}
+
+// ==========================================
+// MODELS
+// ==========================================
+
+model User {
+  id             String          @id @default(uuid()) @db.Uuid
+  email          String          @unique
+  passwordHash   String
+  displayName    String
+  timezone       String          @default("Asia/Karachi")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  refreshTokens  RefreshToken[]
+  inboxItems     InboxItem[]
+  tasks          Task[]
+  followUps      FollowUp[]
+  meetings       Meeting[]
+  notes          Note[]
+  calendarEvents CalendarEvent[]
+  reminders      Reminder[]
+  attachments    Attachment[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  userId     String    @db.Uuid
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model InboxItem {
+  id                  String          @id @default(uuid()) @db.Uuid
+  content             String          @db.Text
+  type                InboxItemType   @default(NOTE)
+  status              InboxItemStatus @default(NEW)
+  source              String?         @default("WEB")
+  idempotencyKey      String?         @unique
+  convertedEntityType String?
+  convertedEntityId   String?         @db.Uuid
+  capturedAt          DateTime        @default(now())
+  processedAt         DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  userId              String          @db.Uuid
+  user                User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, capturedAt])
+  @@map("inbox_items")
+}
+
+model Task {
+  id             String          @id @default(uuid()) @db.Uuid
+  title          String
+  description    String?         @db.Text
+  status         TaskStatus      @default(INBOX)
+  priority       Priority        @default(MEDIUM)
+  type           TaskType        @default(TASK)
+  dueAt          DateTime?
+  completedAt    DateTime?
+  assigneeName   String?
+  assigneeEmail  String?
+  sourceUrl      String?
+  sourceSystem   String?
+  sortOrder      Int             @default(0)
+  archivedAt     DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  userId         String          @db.Uuid
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  subtasks       Subtask[]
+  followUps      FollowUp[]
+  meetingActions MeetingAction[]
+  tags           TaskTag[]
+  reminders      Reminder[]
+  attachments    Attachment[]
+
+  @@index([userId, status, dueAt])
+  @@index([userId, priority])
+  @@index([userId, updatedAt])
+  @@map("tasks")
+}
+
+model Subtask {
+  id          String   @id @default(uuid()) @db.Uuid
+  title       String
+  isCompleted Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  taskId      String   @db.Uuid
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, sortOrder])
+  @@map("subtasks")
+}
+
+model FollowUp {
+  id              String         @id @default(uuid()) @db.Uuid
+  contactName     String
+  organization    String?
+  subject         String
+  context         String?        @db.Text
+  expectedOutcome String?        @db.Text
+  status          FollowUpStatus @default(OPEN)
+  lastContactedAt DateTime?
+  nextFollowUpAt  DateTime
+  completedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  userId          String         @db.Uuid
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  taskId          String?        @db.Uuid
+  task            Task?          @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  meetingId       String?        @db.Uuid
+  meeting         Meeting?       @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status, nextFollowUpAt])
+  @@map("follow_ups")
+}
+
+model Meeting {
+  id             String          @id @default(uuid()) @db.Uuid
+  title          String
+  description    String?         @db.Text
+  status         MeetingStatus   @default(SCHEDULED)
+  startedAt      DateTime
+  endedAt        DateTime?
+  location       String?
+  meetingUrl     String?
+  participants   Json?
+  notesMarkdown  String?         @db.Text
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  userId         String          @db.Uuid
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  actions        MeetingAction[]
+  decisions      Decision[]
+  followUps      FollowUp[]
+  reminders      Reminder[]
+
+  @@index([userId, startedAt])
+  @@map("meetings")
+}
+
+model MeetingAction {
+  id          String    @id @default(uuid()) @db.Uuid
+  title       String
+  ownerName   String?
+  dueAt       DateTime?
+  isCompleted Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  meetingId   String    @db.Uuid
+  meeting     Meeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  taskId      String?   @db.Uuid
+  task        Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([meetingId])
+  @@map("meeting_actions")
+}
+
+model Decision {
+  id          String   @id @default(uuid()) @db.Uuid
+  title       String
+  description String?  @db.Text
+  decidedAt   DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  meetingId   String   @db.Uuid
+  meeting     Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([meetingId, decidedAt])
+  @@map("decisions")
+}
+
+model Note {
+  id          String       @id @default(uuid()) @db.Uuid
+  title       String
+  content     String       @db.Text
+  isPinned    Boolean      @default(false)
+  sourceUrl   String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  userId      String       @db.Uuid
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tags        NoteTag[]
+  attachments Attachment[]
+
+  @@index([userId, updatedAt])
+  @@map("notes")
+}
+
+model Tag {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @unique
+  createdAt DateTime  @default(now())
+
+  tasks     TaskTag[]
+  notes     NoteTag[]
+
+  @@map("tags")
+}
+
+model TaskTag {
+  taskId String @db.Uuid
+  tagId  String @db.Uuid
+
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, tagId])
+  @@map("task_tags")
+}
+
+model NoteTag {
+  noteId String @db.Uuid
+  tagId  String @db.Uuid
+
+  note   Note   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+  @@map("note_tags")
+}
+
+model CalendarEvent {
+  id          String            @id @default(uuid()) @db.Uuid
+  title       String
+  description String?           @db.Text
+  eventType   CalendarEventType @default(OTHER)
+  startAt     DateTime
+  endAt       DateTime?
+  allDay      Boolean           @default(false)
+  sourceUrl   String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  userId      String            @db.Uuid
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startAt])
+  @@map("calendar_events")
+}
+
+model Reminder {
+  id        String         @id @default(uuid()) @db.Uuid
+  title     String
+  remindAt  DateTime
+  status    ReminderStatus @default(PENDING)
+  sentAt    DateTime?
+  createdAt DateTime       @default(now())
+
+  userId    String         @db.Uuid
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  taskId    String?        @db.Uuid
+  task      Task?          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  meetingId String?        @db.Uuid
+  meeting   Meeting?       @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, remindAt])
+  @@map("reminders")
+}
+
+model Attachment {
+  id         String   @id @default(uuid()) @db.Uuid
+  fileName   String
+  mimeType   String
+  sizeBytes  BigInt
+  storageKey String   @unique
+  createdAt  DateTime @default(now())
+
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  taskId     String?  @db.Uuid
+  task       Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  noteId     String?  @db.Uuid
+  note       Note?    @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("attachments")
+}
