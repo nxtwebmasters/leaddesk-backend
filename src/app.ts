@@ -12,6 +12,7 @@ import { followupsRouter } from './modules/followups/followups.router';
 import { meetingsRouter } from './modules/meetings/meetings.router';
 import { notesRouter } from './modules/notes/notes.router';
 import { dashboardRouter } from './modules/dashboard/dashboard.router';
+import { contactsRouter } from './modules/contacts/contacts.router';
 import { authenticateJwt } from './common/middleware/auth.middleware';
 import { MeetingsController } from './modules/meetings/meetings.controller';
 
@@ -40,6 +41,7 @@ export function createApp(): Application {
   app.use('/api/v1/decisions', authenticateJwt, MeetingsController.getDecisions);
   app.use('/api/v1/notes', notesRouter);
   app.use('/api/v1/dashboard', dashboardRouter);
+  app.use('/api/v1/contacts', contactsRouter);
 
   // 404 Handler
   app.use((req: Request, res: Response) => {

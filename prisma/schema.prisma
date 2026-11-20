@@ -99,6 +99,7 @@ model User {
   followUps      FollowUp[]
   meetings       Meeting[]
   notes          Note[]
+  contacts       Contact[]
   calendarEvents CalendarEvent[]
   reminders      Reminder[]
   attachments    Attachment[]
@@ -160,6 +161,9 @@ model Task {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
+  contactId      String?         @db.Uuid
+  contact        Contact?        @relation("ContactTasks", fields: [contactId], references: [id], onDelete: SetNull)
+
   userId         String          @db.Uuid
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -204,6 +208,9 @@ model FollowUp {
   completedAt     DateTime?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+
+  contactId       String?        @db.Uuid
+  contact         Contact?       @relation("ContactFollowUps", fields: [contactId], references: [id], onDelete: SetNull)
 
   userId          String         @db.Uuid
   user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -388,4 +395,27 @@ model Attachment {
 
   @@index([userId])
   @@map("attachments")
+}
+
+model Contact {
+  id           String     @id @default(uuid()) @db.Uuid
+  name         String
+  role         String?    // e.g. Senior Frontend Dev, QA Lead, DevOps Engineer, Client
+  organization String?    // e.g. Internal Team, Cloud Team, Client Org
+  email        String?
+  phone        String?
+  handle       String?    // @slack or @teams username
+  notes        String?    @db.Text
+  avatarUrl    String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  userId       String     @db.Uuid
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tasks        Task[]     @relation("ContactTasks")
+  followUps    FollowUp[] @relation("ContactFollowUps")
+
+  @@index([userId, name])
+  @@map("contacts")
 }
