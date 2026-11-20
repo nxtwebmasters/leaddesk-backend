@@ -14,6 +14,7 @@ import { notesRouter } from './modules/notes/notes.router';
 import { dashboardRouter } from './modules/dashboard/dashboard.router';
 import { contactsRouter } from './modules/contacts/contacts.router';
 import { calendarRouter } from './modules/calendar/calendar.router';
+import { attachmentsRouter } from './modules/attachments/attachments.router';
 import { authenticateJwt } from './common/middleware/auth.middleware';
 import { MeetingsController } from './modules/meetings/meetings.controller';
 
@@ -44,6 +45,7 @@ export function createApp(): Application {
   app.use('/api/v1/dashboard', dashboardRouter);
   app.use('/api/v1/contacts', contactsRouter);
   app.use('/api/v1/calendar', calendarRouter);
+  app.use('/api/v1/attachments', attachmentsRouter);
 
   // 404 Handler
   app.use((req: Request, res: Response) => {

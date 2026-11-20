@@ -246,6 +246,7 @@ model Meeting {
   decisions      Decision[]
   followUps      FollowUp[]
   reminders      Reminder[]
+  attachments    Attachment[]
 
   @@index([userId, startedAt])
   @@map("meetings")
@@ -392,6 +393,9 @@ model Attachment {
 
   noteId     String?  @db.Uuid
   note       Note?    @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  meetingId  String?  @db.Uuid
+  meeting    Meeting? @relation(fields: [meetingId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("attachments")
