@@ -15,6 +15,7 @@ import { dashboardRouter } from './modules/dashboard/dashboard.router';
 import { contactsRouter } from './modules/contacts/contacts.router';
 import { calendarRouter } from './modules/calendar/calendar.router';
 import { attachmentsRouter } from './modules/attachments/attachments.router';
+import { notificationsRouter } from './modules/notifications/notifications.router';
 import { authenticateJwt } from './common/middleware/auth.middleware';
 import { MeetingsController } from './modules/meetings/meetings.controller';
 
@@ -46,6 +47,7 @@ export function createApp(): Application {
   app.use('/api/v1/contacts', contactsRouter);
   app.use('/api/v1/calendar', calendarRouter);
   app.use('/api/v1/attachments', attachmentsRouter);
+  app.use('/api/v1/notifications', notificationsRouter);
 
   // 404 Handler
   app.use((req: Request, res: Response) => {

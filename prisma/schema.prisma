@@ -100,9 +100,11 @@ model User {
   meetings       Meeting[]
   notes          Note[]
   contacts       Contact[]
-  calendarEvents CalendarEvent[]
-  reminders      Reminder[]
-  attachments    Attachment[]
+  calendarEvents    CalendarEvent[]
+  reminders         Reminder[]
+  attachments       Attachment[]
+  pushSubscriptions PushSubscription[]
+  notifications     AppNotification[]
 
   @@map("users")
 }
@@ -422,4 +424,36 @@ model Contact {
 
   @@index([userId, name])
   @@map("contacts")
+}
+
+model PushSubscription {
+  id         String   @id @default(uuid()) @db.Uuid
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+model AppNotification {
+  id        String   @id @default(uuid()) @db.Uuid
+  title     String
+  body      String   @db.Text
+  type      String   @default("GENERAL") // DAILY_KICKOFF, MEETING_ALERT, FOLLOWUP_SWEEP, REMINDER, GENERAL
+  isRead    Boolean  @default(false)
+  actionUrl String?
+  createdAt DateTime @default(now())
+
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@map("app_notifications")
 }
