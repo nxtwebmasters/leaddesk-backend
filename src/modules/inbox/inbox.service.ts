@@ -1,5 +1,5 @@
 import { prisma } from '../../common/prisma';
-import { CreateInboxInput, UpdateInboxInput, ConvertInboxInput } from './inbox.types';
+import { CreateInboxInput, UpdateInboxInput, ConvertInboxInput, BatchCreateInput } from './inbox.types';
 import { InboxItemStatus } from '@prisma/client';
 
 export class InboxService {
@@ -204,5 +204,115 @@ export class InboxService {
       results.push(created);
     }
     return results;
+  }
+
+  public static async batchCreate(userId: string, input: BatchCreateInput) {
+    return prisma.$transaction(async (tx) => {
+      const createdTasks = [];
+      const createdFollowUps = [];
+      const createdDecisions = [];
+      const createdNotes = [];
+
+      // 1. Create Tasks
+      for (const t of input.tasks) {
+        const task = await tx.task.create({
+          data: {
+            userId,
+            title: t.title,
+            description: t.description || null,
+            priority: t.priority,
+            type: t.type,
+            assigneeName: t.assigneeName || null,
+            dueAt: t.dueAt ? new Date(t.dueAt) : null,
+            status: 'PLANNED',
+          },
+        });
+        createdTasks.push(task);
+      }
+
+      // 2. Create Follow-ups
+      for (const f of input.followUps) {
+        const followUp = await tx.followUp.create({
+          data: {
+            userId,
+            contactName: f.contactName,
+            subject: f.subject,
+            context: f.context || null,
+            nextFollowUpAt: new Date(f.nextFollowUpAt),
+            expectedOutcome: f.expectedOutcome || null,
+            status: 'OPEN',
+          },
+        });
+        createdFollowUps.push(followUp);
+      }
+
+      // 3. Create Decisions
+      for (const d of input.decisions) {
+        const decision = await tx.decision.create({
+          data: {
+            userId,
+            title: d.title,
+            description: d.description || null,
+            decidedAt: d.decidedAt ? new Date(d.decidedAt) : new Date(),
+          },
+        });
+        createdDecisions.push(decision);
+      }
+
+      // 4. Create Notes
+      for (const n of input.notes) {
+        const note = await tx.note.create({
+          data: {
+            userId,
+            title: n.title,
+            content: n.content,
+          },
+        });
+
+        if (n.tags && n.tags.length > 0) {
+          for (const tagName of n.tags) {
+            const cleanTag = tagName.trim().toLowerCase();
+            if (!cleanTag) continue;
+
+            const tag = await tx.tag.upsert({
+              where: { name: cleanTag },
+              create: { name: cleanTag },
+              update: {},
+            });
+
+            await tx.noteTag.create({
+              data: {
+                noteId: note.id,
+                tagId: tag.id,
+              },
+            });
+          }
+        }
+        createdNotes.push(note);
+      }
+
+      // 5. Mark original inbox item as processed if ID provided
+      if (input.inboxItemId) {
+        await tx.inboxItem.updateMany({
+          where: { id: input.inboxItemId, userId },
+          data: {
+            status: 'PROCESSED',
+            processedAt: new Date(),
+            convertedEntityType: 'BATCH',
+          },
+        });
+      }
+
+      return {
+        tasksCount: createdTasks.length,
+        followUpsCount: createdFollowUps.length,
+        decisionsCount: createdDecisions.length,
+        notesCount: createdNotes.length,
+        createdTasks,
+        createdFollowUps,
+        createdDecisions,
+        createdNotes,
+      };
+    });
   }
 }

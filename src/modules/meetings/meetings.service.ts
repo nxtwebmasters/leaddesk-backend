@@ -405,16 +405,21 @@ export class MeetingsService {
 
   public static async findDecisions(userId: string, filters: DecisionFilters) {
     const where: Prisma.DecisionWhereInput = {
-      meeting: {
-        userId,
-      },
+      OR: [
+        { userId },
+        { meeting: { userId } },
+      ],
     };
 
     if (filters.search) {
-      where.OR = [
-        { title: { contains: filters.search, mode: 'insensitive' } },
-        { description: { contains: filters.search, mode: 'insensitive' } },
-        { meeting: { title: { contains: filters.search, mode: 'insensitive' } } },
+      where.AND = [
+        {
+          OR: [
+            { title: { contains: filters.search, mode: 'insensitive' } },
+            { description: { contains: filters.search, mode: 'insensitive' } },
+            { meeting: { title: { contains: filters.search, mode: 'insensitive' } } },
+          ],
+        },
       ];
     }
 

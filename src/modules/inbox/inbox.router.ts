@@ -10,6 +10,8 @@ router.use(authenticateJwt);
 router.post('/', InboxController.create);
 router.get('/', InboxController.list);
 router.post('/sync', InboxController.sync);
+router.post('/decompose', InboxController.decompose);
+router.post('/batch-create', InboxController.batchCreate);
 router.get('/:id', InboxController.getById);
 router.patch('/:id', InboxController.update);
 router.post('/:id/dismiss', InboxController.dismiss);

@@ -21,6 +21,7 @@ const envSchema = z.object({
   VAPID_PUBLIC_KEY: z.string().default('BJOGCNTZjCBaU70HIeXw47o5Y0aXDEYgm-vizoICOrUvIYf6g0uJEo_mEBHzbrNQeDE92fu1Ka5b8Gc7vq6cw84'),
   VAPID_PRIVATE_KEY: z.string().default('93QNPZcybAmqHolE4Q-L3S-MqkihvtlHdscP4CjBF0g'),
   VAPID_SUBJECT: z.string().default('mailto:lead@example.com'),
+  GEMINI_API_KEY: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -66,3 +66,98 @@ export const convertInboxSchema = z.object({
 export type CreateInboxInput = z.infer<typeof createInboxItemSchema>;
 export type UpdateInboxInput = z.infer<typeof updateInboxItemSchema>;
 export type ConvertInboxInput = z.infer<typeof convertInboxSchema>;
+
+// ==========================================
+// AI & NLP DECOMPOSITION SCHEMAS
+// ==========================================
+
+export const DecomposeInputSchema = z.object({
+  text: z.string().min(1, 'Text content cannot be empty'),
+  inboxItemId: z.string().uuid().optional(),
+});
+
+export type DecomposeInput = z.infer<typeof DecomposeInputSchema>;
+
+export interface ExtractedTaskCandidate {
+  title: string;
+  description?: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  type: 'TASK' | 'DELEGATED' | 'PERSONAL';
+  assigneeName?: string | null;
+  dueAt?: string | null;
+}
+
+export interface ExtractedFollowUpCandidate {
+  contactName: string;
+  subject: string;
+  context?: string | null;
+  nextFollowUpAt: string;
+  expectedOutcome?: string | null;
+}
+
+export interface ExtractedDecisionCandidate {
+  title: string;
+  description?: string | null;
+  decidedAt?: string | null;
+}
+
+export interface ExtractedNoteCandidate {
+  title: string;
+  content: string;
+  tags: string[];
+}
+
+export interface DecompositionResult {
+  summary: string;
+  tasks: ExtractedTaskCandidate[];
+  followUps: ExtractedFollowUpCandidate[];
+  decisions: ExtractedDecisionCandidate[];
+  notes: ExtractedNoteCandidate[];
+}
+
+export const BatchCreateSchema = z.object({
+  inboxItemId: z.string().uuid().optional(),
+  tasks: z
+    .array(
+      z.object({
+        title: z.string().min(1, 'Task title is required'),
+        description: z.string().optional().nullable(),
+        priority: PriorityEnum.default('MEDIUM'),
+        type: TaskTypeEnum.default('TASK'),
+        assigneeName: z.string().optional().nullable(),
+        dueAt: z.string().datetime().optional().nullable(),
+      })
+    )
+    .default([]),
+  followUps: z
+    .array(
+      z.object({
+        contactName: z.string().min(1, 'Contact name is required'),
+        subject: z.string().min(1, 'Subject is required'),
+        context: z.string().optional().nullable(),
+        nextFollowUpAt: z.string().datetime('Valid date required for follow-up'),
+        expectedOutcome: z.string().optional().nullable(),
+      })
+    )
+    .default([]),
+  decisions: z
+    .array(
+      z.object({
+        title: z.string().min(1, 'Decision title is required'),
+        description: z.string().optional().nullable(),
+        decidedAt: z.string().datetime().optional().nullable(),
+      })
+    )
+    .default([]),
+  notes: z
+    .array(
+      z.object({
+        title: z.string().min(1, 'Note title is required'),
+        content: z.string().default(''),
+        tags: z.array(z.string()).default([]),
+      })
+    )
+    .default([]),
+});
+
+export type BatchCreateInput = z.infer<typeof BatchCreateSchema>;

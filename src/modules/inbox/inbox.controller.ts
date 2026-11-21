@@ -4,8 +4,11 @@ import {
   updateInboxItemSchema,
   convertInboxSchema,
   syncInboxSchema,
+  DecomposeInputSchema,
+  BatchCreateSchema,
 } from './inbox.types';
 import { InboxService } from './inbox.service';
+import { AiDecompositionService } from './ai-decomposition.service';
 import { sendSuccess, sendError } from '../../common/response';
 import { InboxItemStatus } from '@prisma/client';
 
@@ -103,5 +106,47 @@ export class InboxController {
 
     const items = await InboxService.sync(userId, parseResult.data.items);
     return sendSuccess(res, { syncedCount: items.length, items });
+  }
+
+  public static async decompose(req: Request, res: Response) {
+    try {
+      const parseResult = DecomposeInputSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return sendError(res, 'VALIDATION_ERROR', 'Invalid decomposition request.', 400, parseResult.error.errors);
+      }
+
+      let textToDecompose = parseResult.data.text;
+      const userId = req.user!.userId;
+
+      // If an existing inbox item is referenced and text is short, pull original content
+      if (parseResult.data.inboxItemId && textToDecompose.length < 5) {
+        const existing = await InboxService.getById(userId, parseResult.data.inboxItemId);
+        if (existing) {
+          textToDecompose = existing.content;
+        }
+      }
+
+      const result = await AiDecompositionService.decompose(textToDecompose);
+      return sendSuccess(res, result);
+    } catch (error: any) {
+      console.error('Error in AI decomposition:', error);
+      return sendError(res, 'INTERNAL_SERVER_ERROR', error.message || 'Decomposition failed', 500);
+    }
+  }
+
+  public static async batchCreate(req: Request, res: Response) {
+    try {
+      const parseResult = BatchCreateSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return sendError(res, 'VALIDATION_ERROR', 'Invalid batch payload.', 400, parseResult.error.errors);
+      }
+
+      const userId = req.user!.userId;
+      const result = await InboxService.batchCreate(userId, parseResult.data);
+      return sendSuccess(res, result, undefined, 201);
+    } catch (error: any) {
+      console.error('Error in batch creation:', error);
+      return sendError(res, 'INTERNAL_SERVER_ERROR', error.message || 'Failed to batch create items', 500);
+    }
   }
 }

@@ -105,6 +105,7 @@ model User {
   attachments       Attachment[]
   pushSubscriptions PushSubscription[]
   notifications     AppNotification[]
+  decisions         Decision[]
 
   @@map("users")
 }
@@ -280,10 +281,14 @@ model Decision {
   decidedAt   DateTime @default(now())
   createdAt   DateTime @default(now())
 
-  meetingId   String   @db.Uuid
-  meeting     Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  userId      String?  @db.Uuid
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  meetingId   String?  @db.Uuid
+  meeting     Meeting? @relation(fields: [meetingId], references: [id], onDelete: Cascade)
 
   @@index([meetingId, decidedAt])
+  @@index([userId, decidedAt])
   @@map("decisions")
 }
 
