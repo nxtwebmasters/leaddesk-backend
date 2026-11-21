@@ -121,6 +121,8 @@ model User {
   orgMemberships    OrgMembership[]
   ledTeams          Team[]              @relation("TeamLead")
   devexPulses       DevExPulse[]
+  auditLogs         AuditLog[]
+  complianceExports ComplianceExport[]
 
   @@map("users")
 }
@@ -527,6 +529,9 @@ model Organization {
   incidents      Incident[]
   devexPulses    DevExPulse[]
   objectives     Objective[]
+  auditLogs      AuditLog[]
+  retentionPolicies RetentionPolicy[]
+  complianceExports ComplianceExport[]
 
   @@map("organizations")
 }
@@ -913,5 +918,72 @@ model KeyResult {
   @@index([objectiveId])
   @@map("key_results")
 }
+
+// ==========================================
+// V3 PHASE 5: ENTERPRISE SECURITY & COMPLIANCE
+// ==========================================
+
+model AuditLog {
+  id           String       @id @default(uuid()) @db.Uuid
+  action       String       // e.g. "USER_LOGIN", "ROLE_CHANGE", "ORGANIZATION_UPDATE", "INTEGRATION_CREATE", "DATA_PURGE", "GDPR_FORGET", etc.
+  entityType   String       // e.g. "User", "Organization", "Team", "Integration", "Deployment", "RetentionPolicy"
+  entityId     String?
+  ipAddress    String?
+  userAgent    String?
+  payload      Json?        // Change delta / metadata
+  prevHash     String       // SHA-256 hash of previous log in this org (or 'GENESIS')
+  hash         String       // SHA-256 hash of (prevHash + orgId + action + entityType + entityId + timestamp + JSON(payload))
+  createdAt    DateTime     @default(now())
+
+  orgId        String       @db.Uuid
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  userId       String?      @db.Uuid
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, createdAt])
+  @@index([orgId, action])
+  @@index([orgId, entityType])
+  @@map("audit_logs")
+}
+
+model RetentionPolicy {
+  id             String       @id @default(uuid()) @db.Uuid
+  entityType     String       // "AUDIT_LOGS", "INTEGRATION_EVENTS", "INBOX_ITEMS", "TASKS", "MEETINGS"
+  retentionDays  Int          @default(365) // 30, 90, 180, 365, 2555 (7 years)
+  action         String       @default("DELETE") // "DELETE", "ANONYMIZE", "ARCHIVE"
+  isActive       Boolean      @default(true)
+  legalHold      Boolean      @default(false) // When true, purges are strictly blocked
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  orgId          String       @db.Uuid
+  organization   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, entityType])
+  @@map("retention_policies")
+}
+
+model ComplianceExport {
+  id             String       @id @default(uuid()) @db.Uuid
+  type           String       // "GDPR_TAKEOUT", "LEGAL_DISCOVERY", "AUDIT_REPORT"
+  status         String       @default("COMPLETED") // "PENDING", "PROCESSING", "COMPLETED", "FAILED"
+  downloadUrl    String?
+  filter         Json?        // Target User / criteria
+  fileSizeBytes  Int?
+  recordCount    Int          @default(0)
+  expiresAt      DateTime
+  createdAt      DateTime     @default(now())
+
+  orgId          String       @db.Uuid
+  organization   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  requestedById  String?      @db.Uuid
+  requestedBy    User?        @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+
+  @@index([orgId, createdAt])
+  @@map("compliance_exports")
+}
+
 
 
