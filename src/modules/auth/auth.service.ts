@@ -44,6 +44,55 @@ export class AuthService {
     };
   }
 
+  public static async register(displayName: string, email: string, password: string, timezone?: string) {
+    const normalizedEmail = email.toLowerCase().trim();
+    const existing = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (existing) {
+      throw new Error('Email already registered');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+
+    const user = await prisma.user.create({
+      data: {
+        displayName: displayName.trim(),
+        email: normalizedEmail,
+        passwordHash,
+        timezone: timezone || 'Asia/Karachi',
+      },
+    });
+
+    const payload = { userId: user.id, email: user.email };
+    const accessToken = TokenService.signAccessToken(payload);
+    const { rawToken, tokenHash, expiresAt } = TokenService.generateRefreshToken();
+
+    await prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        tokenHash,
+        expiresAt,
+      },
+    });
+
+    const safeUser = {
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      timezone: user.timezone,
+      createdAt: user.createdAt,
+    };
+
+    return {
+      user: safeUser,
+      accessToken,
+      refreshToken: rawToken,
+    };
+  }
+
   public static async refresh(rawRefreshToken: string) {
     const tokenHash = TokenService.hashToken(rawRefreshToken);
 

@@ -9,6 +9,13 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
+const registerSchema = z.object({
+  displayName: z.string().trim().min(2, 'Full name must be at least 2 characters'),
+  email: z.string().trim().toLowerCase().email('Please enter a valid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters long'),
+  timezone: z.string().optional(),
+});
+
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required'),
   newPassword: z.string().min(8, 'New password must be at least 8 characters long'),
@@ -42,6 +49,39 @@ export class AuthController {
       user: result.user,
       accessToken: result.accessToken,
     });
+  }
+
+  public static async register(req: Request, res: Response) {
+    const parseResult = registerSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return sendError(
+        res,
+        'VALIDATION_ERROR',
+        parseResult.error.errors[0]?.message || 'Invalid registration details',
+        400,
+        parseResult.error.errors
+      );
+    }
+
+    const { displayName, email, password, timezone } = parseResult.data;
+    try {
+      const result = await AuthService.register(displayName, email, password, timezone);
+      res.cookie('refreshToken', result.refreshToken, COOKIE_OPTIONS);
+      return sendSuccess(
+        res,
+        {
+          user: result.user,
+          accessToken: result.accessToken,
+        },
+        undefined,
+        201
+      );
+    } catch (err: any) {
+      if (err.message === 'Email already registered') {
+        return sendError(res, 'CONFLICT', 'An account with this email already exists.', 409);
+      }
+      return sendError(res, 'INTERNAL_ERROR', 'Registration failed. Please try again.', 500);
+    }
   }
 
   public static async refresh(req: Request, res: Response) {
