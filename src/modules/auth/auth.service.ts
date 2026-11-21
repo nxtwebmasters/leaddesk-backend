@@ -66,6 +66,48 @@ export class AuthService {
       },
     });
 
+    // Auto-provision default organization, workspace, and team
+    try {
+      const orgSlug = `${displayName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${user.id.slice(0, 6)}`;
+      const org = await prisma.organization.create({
+        data: {
+          name: `${displayName.trim()}'s Organization`,
+          slug: orgSlug,
+          domain: normalizedEmail.split('@')[1] || null,
+        },
+      });
+
+      const workspace = await prisma.workspace.create({
+        data: {
+          name: 'Core Engineering',
+          slug: 'core-eng',
+          description: 'Primary engineering and operations workspace',
+          orgId: org.id,
+        },
+      });
+
+      await prisma.team.create({
+        data: {
+          name: 'Platform Pod',
+          description: 'Foundational platform and architecture squad',
+          workspaceId: workspace.id,
+          leadUserId: user.id,
+        },
+      });
+
+      await prisma.orgMembership.create({
+        data: {
+          orgId: org.id,
+          userId: user.id,
+          role: 'OWNER',
+          title: 'Engineering Lead',
+          department: 'Engineering',
+        },
+      });
+    } catch (e) {
+      console.error('Failed to auto-provision organization:', e);
+    }
+
     const payload = { userId: user.id, email: user.email };
     const accessToken = TokenService.signAccessToken(payload);
     const { rawToken, tokenHash, expiresAt } = TokenService.generateRefreshToken();

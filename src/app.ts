@@ -18,6 +18,7 @@ import { attachmentsRouter } from './modules/attachments/attachments.router';
 import { notificationsRouter } from './modules/notifications/notifications.router';
 import { searchRouter } from './modules/search/search.router';
 import { reportsRouter } from './modules/reports/reports.router';
+import { organizationsRouter } from './modules/organizations/organizations.router';
 import { authenticateJwt } from './common/middleware/auth.middleware';
 import { MeetingsController } from './modules/meetings/meetings.controller';
 
@@ -52,6 +53,7 @@ export function createApp(): Application {
   app.use('/api/v1/notifications', notificationsRouter);
   app.use('/api/v1/search', searchRouter);
   app.use('/api/v1/reports', reportsRouter);
+  app.use('/api/v1/orgs', organizationsRouter);
 
   // 404 Handler
   app.use((req: Request, res: Response) => {

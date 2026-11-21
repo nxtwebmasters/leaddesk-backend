@@ -12,6 +12,16 @@ datasource db {
 // ENUMS
 // ==========================================
 
+enum OrgRole {
+  OWNER
+  ORG_ADMIN
+  DIRECTOR
+  MANAGER
+  MEMBER
+  GUEST_STAKEHOLDER
+  COMPLIANCE_AUDITOR
+}
+
 enum TaskStatus {
   INBOX
   PLANNED
@@ -106,6 +116,8 @@ model User {
   pushSubscriptions PushSubscription[]
   notifications     AppNotification[]
   decisions         Decision[]
+  orgMemberships    OrgMembership[]
+  ledTeams          Team[]              @relation("TeamLead")
 
   @@map("users")
 }
@@ -166,6 +178,9 @@ model Task {
 
   contactId      String?         @db.Uuid
   contact        Contact?        @relation("ContactTasks", fields: [contactId], references: [id], onDelete: SetNull)
+
+  workspaceId    String?         @db.Uuid
+  workspace      Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
   userId         String          @db.Uuid
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -242,6 +257,9 @@ model Meeting {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
+  workspaceId    String?         @db.Uuid
+  workspace      Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
   userId         String          @db.Uuid
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -300,6 +318,9 @@ model Note {
   sourceUrl   String?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+
+  workspaceId String?      @db.Uuid
+  workspace   Workspace?   @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
   userId      String       @db.Uuid
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -461,4 +482,125 @@ model AppNotification {
 
   @@index([userId, isRead, createdAt])
   @@map("app_notifications")
+}
+
+// ==========================================
+// V3 ENTERPRISE MULTI-TENANCY & RBAC
+// ==========================================
+
+model Organization {
+  id             String          @id @default(uuid()) @db.Uuid
+  name           String
+  slug           String          @unique
+  domain         String?
+  logoUrl        String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  workspaces     Workspace[]
+  memberships    OrgMembership[]
+  invitations    OrgInvitation[]
+
+  @@map("organizations")
+}
+
+model Workspace {
+  id             String          @id @default(uuid()) @db.Uuid
+  name           String
+  description    String?
+  slug           String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  orgId          String          @db.Uuid
+  organization   Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  parentId       String?         @db.Uuid
+  parent         Workspace?      @relation("WorkspaceHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children       Workspace[]     @relation("WorkspaceHierarchy")
+
+  teams          Team[]
+  tasks          Task[]
+  meetings       Meeting[]
+  notes          Note[]
+
+  @@unique([orgId, slug])
+  @@index([orgId])
+  @@map("workspaces")
+}
+
+model Team {
+  id             String          @id @default(uuid()) @db.Uuid
+  name           String
+  description    String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  workspaceId    String          @db.Uuid
+  workspace      Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  leadUserId     String?         @db.Uuid
+  leadUser       User?           @relation("TeamLead", fields: [leadUserId], references: [id], onDelete: SetNull)
+
+  memberships    TeamMembership[]
+
+  @@index([workspaceId])
+  @@map("teams")
+}
+
+model OrgMembership {
+  id             String          @id @default(uuid()) @db.Uuid
+  role           OrgRole         @default(MEMBER)
+  title          String?
+  department     String?
+  joinedAt       DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  orgId          String          @db.Uuid
+  organization   Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  userId         String          @db.Uuid
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  reportsToId    String?         @db.Uuid
+  reportsTo      OrgMembership?  @relation("ReportingLine", fields: [reportsToId], references: [id], onDelete: SetNull)
+  directReports  OrgMembership[] @relation("ReportingLine")
+
+  teamMemberships TeamMembership[]
+
+  @@unique([orgId, userId])
+  @@index([orgId, role])
+  @@index([reportsToId])
+  @@map("org_memberships")
+}
+
+model TeamMembership {
+  id             String          @id @default(uuid()) @db.Uuid
+  isTechLead     Boolean         @default(false)
+  joinedAt       DateTime        @default(now())
+
+  teamId         String          @db.Uuid
+  team           Team            @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  membershipId   String          @db.Uuid
+  orgMembership  OrgMembership   @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, membershipId])
+  @@map("team_memberships")
+}
+
+model OrgInvitation {
+  id             String          @id @default(uuid()) @db.Uuid
+  email          String
+  role           OrgRole         @default(MEMBER)
+  token          String          @unique
+  expiresAt      DateTime
+  invitedById    String          @db.Uuid
+  createdAt      DateTime        @default(now())
+
+  orgId          String          @db.Uuid
+  organization   Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, email])
+  @@map("org_invitations")
 }
