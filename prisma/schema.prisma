@@ -173,6 +173,8 @@ model Task {
   assigneeEmail  String?
   sourceUrl      String?
   sourceSystem   String?
+  externalKey    String?         // e.g. "ENG-1024" or "LIN-42"
+  lastSyncedAt   DateTime?
   sortOrder      Int             @default(0)
   archivedAt     DateTime?
   createdAt      DateTime        @default(now())
@@ -517,6 +519,9 @@ model Organization {
   workspaces     Workspace[]
   memberships    OrgMembership[]
   invitations    OrgInvitation[]
+  integrations   Integration[]
+  pullRequests   PullRequestWatch[]
+  integrationEvents IntegrationEvent[]
 
   @@map("organizations")
 }
@@ -540,6 +545,7 @@ model Workspace {
   tasks          Task[]
   meetings       Meeting[]
   notes          Note[]
+  integrations   Integration[]
 
   @@unique([orgId, slug])
   @@index([orgId])
@@ -622,3 +628,115 @@ model OrgInvitation {
   @@index([orgId, email])
   @@map("org_invitations")
 }
+
+// ==========================================
+// V3 PHASE 3: TOOLCHAIN EVENT MESH MODELS
+// ==========================================
+
+enum IntegrationProvider {
+  GITHUB
+  GITLAB
+  JIRA
+  LINEAR
+  SLACK
+  TEAMS
+}
+
+enum PrStatus {
+  OPEN
+  MERGED
+  CLOSED
+  DRAFT
+}
+
+enum EventStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+  IGNORED
+}
+
+model Integration {
+  id             String               @id @default(uuid()) @db.Uuid
+  provider       IntegrationProvider
+  name           String               // e.g. "Acme Core GitHub", "Platform Jira Cloud"
+  isEnabled      Boolean              @default(true)
+  webhookSecret  String?              // Secret used for HMAC-SHA256 signature verification
+  apiKey         String?              // Outbound API token / OAuth Bearer token
+  externalOrg    String?              // External org or workspace ID (e.g. GitHub org, Slack team)
+  config         Json?                // Provider-specific config (e.g. { prSlaHours: 24, channelId: "C12345" })
+  lastSyncAt     DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  orgId          String               @db.Uuid
+  organization   Organization         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  workspaceId    String?              @db.Uuid
+  workspace      Workspace?           @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  events         IntegrationEvent[]
+  pullRequests   PullRequestWatch[]
+
+  @@unique([orgId, provider, name])
+  @@index([orgId, provider])
+  @@map("integrations")
+}
+
+model PullRequestWatch {
+  id                   String              @id @default(uuid()) @db.Uuid
+  provider             IntegrationProvider @default(GITHUB)
+  repository           String              // e.g. "acme/payment-gateway"
+  prNumber             Int
+  title                String
+  prUrl                String
+  authorUsername       String
+  authorEmail          String?
+  status               PrStatus            @default(OPEN)
+  reviewState          String?             // 'PENDING' | 'APPROVED' | 'CHANGES_REQUESTED'
+  requestedReviewers   String[]            @default([])
+  openedAt             DateTime
+  firstReviewAt        DateTime?
+  reviewLatencyMinutes Int?
+  mergedAt             DateTime?
+  closedAt             DateTime?
+  isStalled            Boolean             @default(false)
+  slaBreachedAt        DateTime?
+  lastActivityAt       DateTime            @default(now())
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  integrationId        String              @db.Uuid
+  integration          Integration         @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  orgId                String              @db.Uuid
+  organization         Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([integrationId, repository, prNumber])
+  @@index([orgId, status, isStalled])
+  @@index([orgId, openedAt])
+  @@map("pull_request_watches")
+}
+
+model IntegrationEvent {
+  id             String               @id @default(uuid()) @db.Uuid
+  provider       IntegrationProvider
+  eventType      String               // e.g. "pull_request.opened", "jira:issue_updated", "slack.command"
+  deliveryId     String?              // External header ID (e.g. X-GitHub-Delivery)
+  payload        Json
+  status         EventStatus          @default(RECEIVED)
+  errorMessage   String?
+  processedAt    DateTime?
+  createdAt      DateTime             @default(now())
+
+  integrationId  String?              @db.Uuid
+  integration    Integration?         @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+
+  orgId          String               @db.Uuid
+  organization   Organization         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, provider, createdAt])
+  @@index([deliveryId])
+  @@map("integration_events")
+}
+

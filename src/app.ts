@@ -19,6 +19,7 @@ import { notificationsRouter } from './modules/notifications/notifications.route
 import { searchRouter } from './modules/search/search.router';
 import { reportsRouter } from './modules/reports/reports.router';
 import { organizationsRouter } from './modules/organizations/organizations.router';
+import { integrationsRouter } from './modules/integrations/integrations.router';
 import { scimRouter } from './modules/scim/scim.router';
 import { authenticateJwt } from './common/middleware/auth.middleware';
 import { MeetingsController } from './modules/meetings/meetings.controller';
@@ -58,6 +59,7 @@ export function createApp(): Application {
   app.use('/api/v1/search', searchRouter);
   app.use('/api/v1/reports', reportsRouter);
   app.use('/api/v1/orgs', organizationsRouter);
+  app.use('/api/v1/integrations', integrationsRouter);
 
   // 404 Handler
   app.use((req: Request, res: Response) => {
