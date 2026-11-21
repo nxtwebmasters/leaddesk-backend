@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
 import { sendError } from '../response';
-import { OrgRole } from '@prisma/client';
+import { OrgRole } from '../../modules/organizations/organizations.types';
 
 declare global {
   namespace Express {

@@ -1,5 +1,26 @@
 import { z } from 'zod';
-import { OrgRole } from '@prisma/client';
+
+export const OrgRole = {
+  OWNER: 'OWNER',
+  ORG_ADMIN: 'ORG_ADMIN',
+  DIRECTOR: 'DIRECTOR',
+  MANAGER: 'MANAGER',
+  MEMBER: 'MEMBER',
+  GUEST_STAKEHOLDER: 'GUEST_STAKEHOLDER',
+  COMPLIANCE_AUDITOR: 'COMPLIANCE_AUDITOR',
+} as const;
+
+export type OrgRole = keyof typeof OrgRole;
+
+export const OrgRoleEnum = z.enum([
+  'OWNER',
+  'ORG_ADMIN',
+  'DIRECTOR',
+  'MANAGER',
+  'MEMBER',
+  'GUEST_STAKEHOLDER',
+  'COMPLIANCE_AUDITOR',
+]);
 
 export const CreateOrgSchema = z.object({
   name: z.string().trim().min(2, 'Organization name must be at least 2 characters'),
@@ -28,7 +49,7 @@ export const CreateTeamSchema = z.object({
 
 export const InviteMemberSchema = z.object({
   email: z.string().trim().toLowerCase().email('Please enter a valid email address'),
-  role: z.nativeEnum(OrgRole).default(OrgRole.MEMBER),
+  role: OrgRoleEnum.default('MEMBER'),
   title: z.string().trim().optional(),
   department: z.string().trim().optional(),
 });
@@ -38,7 +59,7 @@ export const AcceptInviteSchema = z.object({
 });
 
 export const UpdateMemberRoleSchema = z.object({
-  role: z.nativeEnum(OrgRole).optional(),
+  role: OrgRoleEnum.optional(),
   title: z.string().trim().optional(),
   department: z.string().trim().optional(),
   reportsToId: z.string().uuid().nullable().optional(),

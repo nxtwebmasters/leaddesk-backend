@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { OrganizationsController } from './organizations.controller';
 import { authenticateJwt } from '../../common/middleware/auth.middleware';
 import { tenantContext, requireOrgRole } from '../../common/middleware/tenant.middleware';
-import { OrgRole } from '@prisma/client';
+import { OrgRole } from './organizations.types';
 
 export const organizationsRouter = Router();
 
