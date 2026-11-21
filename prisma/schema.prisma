@@ -120,6 +120,7 @@ model User {
   decisions         Decision[]
   orgMemberships    OrgMembership[]
   ledTeams          Team[]              @relation("TeamLead")
+  devexPulses       DevExPulse[]
 
   @@map("users")
 }
@@ -522,6 +523,10 @@ model Organization {
   integrations   Integration[]
   pullRequests   PullRequestWatch[]
   integrationEvents IntegrationEvent[]
+  deployments    Deployment[]
+  incidents      Incident[]
+  devexPulses    DevExPulse[]
+  objectives     Objective[]
 
   @@map("organizations")
 }
@@ -546,6 +551,8 @@ model Workspace {
   meetings       Meeting[]
   notes          Note[]
   integrations   Integration[]
+  deployments    Deployment[]
+  objectives     Objective[]
 
   @@unique([orgId, slug])
   @@index([orgId])
@@ -566,6 +573,7 @@ model Team {
   leadUser       User?           @relation("TeamLead", fields: [leadUserId], references: [id], onDelete: SetNull)
 
   memberships    TeamMembership[]
+  devexPulses    DevExPulse[]
 
   @@index([workspaceId])
   @@map("teams")
@@ -739,4 +747,171 @@ model IntegrationEvent {
   @@index([deliveryId])
   @@map("integration_events")
 }
+
+// ==========================================
+// V3 PHASE 4: ENGOPS & DORA METRICS MODELS
+// ==========================================
+
+enum DeploymentStatus {
+  SUCCESS
+  FAILED
+  ROLLED_BACK
+}
+
+enum DeploymentEnvironment {
+  PRODUCTION
+  STAGING
+  CANARY
+}
+
+model Deployment {
+  id                 String                @id @default(uuid()) @db.Uuid
+  environment        DeploymentEnvironment @default(PRODUCTION)
+  status             DeploymentStatus      @default(SUCCESS)
+  serviceName        String                // e.g. "auth-gateway", "payment-service"
+  version            String                // e.g. "v3.1.0", "sha-f9a8b7"
+  commitSha          String?
+  commitMessage      String?
+  deployedAt         DateTime              @default(now())
+  leadTimeMinutes    Int?                  // Commit-to-prod cycle latency
+  deployedBy         String?
+  metadata           Json?
+  createdAt          DateTime              @default(now())
+
+  orgId              String                @db.Uuid
+  organization       Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  workspaceId        String?               @db.Uuid
+  workspace          Workspace?            @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  incidents          Incident[]
+
+  @@index([orgId, environment, deployedAt])
+  @@index([orgId, serviceName])
+  @@map("deployments")
+}
+
+enum IncidentSeverity {
+  SEV1_CRITICAL
+  SEV2_HIGH
+  SEV3_MEDIUM
+  SEV4_LOW
+}
+
+enum IncidentStatus {
+  INVESTIGATING
+  IDENTIFIED
+  MITIGATED
+  RESOLVED
+}
+
+model Incident {
+  id                  String            @id @default(uuid()) @db.Uuid
+  title               String
+  description         String?           @db.Text
+  severity            IncidentSeverity  @default(SEV2_HIGH)
+  status              IncidentStatus    @default(RESOLVED)
+  serviceName         String
+  startedAt           DateTime
+  mitigatedAt         DateTime?
+  resolvedAt          DateTime?
+  recoveryTimeMinutes Int?              // MTTR latency
+  rootCause           String?           @db.Text
+  isChangeFailure     Boolean           @default(true)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  deploymentId        String?           @db.Uuid
+  deployment          Deployment?       @relation(fields: [deploymentId], references: [id], onDelete: SetNull)
+
+  orgId               String            @db.Uuid
+  organization        Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, startedAt])
+  @@index([orgId, severity])
+  @@map("incidents")
+}
+
+model DevExPulse {
+  id                 String          @id @default(uuid()) @db.Uuid
+  score              Int             // 1 to 5 overall health/sentiment
+  frictionArea       String?         // 'CODE_REVIEW', 'CI_CD_BUILD', 'ON_CALL', 'REQUIREMENTS', 'MEETINGS', 'NONE'
+  focusTimeHours     Float?          // Hours of uninterrupted flow time this week
+  onCallBurden       Int?            // 1 (Low) to 5 (Overwhelmed)
+  notes              String?         @db.Text
+  isAnonymous        Boolean         @default(true)
+  submittedAt        DateTime        @default(now())
+
+  userId             String?         @db.Uuid
+  user               User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  orgId              String          @db.Uuid
+  organization       Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  teamId             String?         @db.Uuid
+  team               Team?           @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, submittedAt])
+  @@map("devex_pulses")
+}
+
+enum OkrLevel {
+  ORGANIZATION
+  WORKSPACE
+  TEAM
+}
+
+enum OkrStatus {
+  ON_TRACK
+  AT_RISK
+  BEHIND
+  COMPLETED
+  CANCELLED
+}
+
+model Objective {
+  id                 String          @id @default(uuid()) @db.Uuid
+  title              String
+  description        String?         @db.Text
+  level              OkrLevel        @default(WORKSPACE)
+  status             OkrStatus       @default(ON_TRACK)
+  progressPercent    Float           @default(0.0)
+  quarter            String          // e.g. "2026-Q4"
+  startDate          DateTime
+  endDate            DateTime
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  orgId              String          @db.Uuid
+  organization       Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  workspaceId        String?         @db.Uuid
+  workspace          Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  keyResults         KeyResult[]
+
+  @@index([orgId, quarter, status])
+  @@map("objectives")
+}
+
+model KeyResult {
+  id                 String          @id @default(uuid()) @db.Uuid
+  title              String
+  targetValue        Float
+  currentValue       Float           @default(0)
+  initialValue       Float           @default(0)
+  unit               String          @default("hours")
+  status             OkrStatus       @default(ON_TRACK)
+  progressPercent    Float           @default(0.0)
+  ownerName          String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  objectiveId        String          @db.Uuid
+  objective          Objective       @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+
+  @@index([objectiveId])
+  @@map("key_results")
+}
+
 

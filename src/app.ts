@@ -21,6 +21,7 @@ import { reportsRouter } from './modules/reports/reports.router';
 import { organizationsRouter } from './modules/organizations/organizations.router';
 import { integrationsRouter } from './modules/integrations/integrations.router';
 import { scimRouter } from './modules/scim/scim.router';
+import { engopsRouter } from './modules/engops/engops.router';
 import { authenticateJwt } from './common/middleware/auth.middleware';
 import { MeetingsController } from './modules/meetings/meetings.controller';
 
@@ -60,6 +61,7 @@ export function createApp(): Application {
   app.use('/api/v1/reports', reportsRouter);
   app.use('/api/v1/orgs', organizationsRouter);
   app.use('/api/v1/integrations', integrationsRouter);
+  app.use('/api/v1/engops', engopsRouter);
 
   // 404 Handler
   app.use((req: Request, res: Response) => {
