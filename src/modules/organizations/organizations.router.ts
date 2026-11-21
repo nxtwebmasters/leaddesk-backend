@@ -61,3 +61,29 @@ organizationsRouter.delete(
 
 // Visual Hierarchy Tree
 organizationsRouter.get('/:id/hierarchy', tenantContext, OrganizationsController.getHierarchyTree);
+
+// Enterprise SSO & SCIM Configuration
+organizationsRouter.get(
+  '/:id/sso',
+  tenantContext,
+  requireOrgRole(OrgRole.OWNER, OrgRole.ORG_ADMIN),
+  OrganizationsController.getSsoConfig
+);
+organizationsRouter.patch(
+  '/:id/sso',
+  tenantContext,
+  requireOrgRole(OrgRole.OWNER, OrgRole.ORG_ADMIN),
+  OrganizationsController.updateSsoConfig
+);
+organizationsRouter.post(
+  '/:id/scim/token',
+  tenantContext,
+  requireOrgRole(OrgRole.OWNER, OrgRole.ORG_ADMIN),
+  OrganizationsController.generateScimToken
+);
+organizationsRouter.delete(
+  '/:id/scim/token',
+  tenantContext,
+  requireOrgRole(OrgRole.OWNER, OrgRole.ORG_ADMIN),
+  OrganizationsController.revokeScimToken
+);

@@ -9,6 +9,7 @@ import {
   AcceptInviteSchema,
   UpdateMemberRoleSchema,
 } from './organizations.types';
+import { updateSsoConfigSchema } from '../auth/sso/sso.types';
 import { sendSuccess, sendError } from '../../common/response';
 
 export class OrganizationsController {
@@ -168,6 +169,55 @@ export class OrganizationsController {
     } catch (error: any) {
       console.error('getHierarchyTree error:', error);
       return sendError(res, 'NOT_FOUND', error.message || 'Organization not found', 404);
+    }
+  }
+
+  static async getSsoConfig(req: Request, res: Response) {
+    try {
+      const orgId = req.params.id;
+      const hostUrl = `${req.protocol}://${req.get('host')}`;
+      const config = await OrganizationsService.getSsoConfig(orgId, hostUrl);
+      return sendSuccess(res, config);
+    } catch (error: any) {
+      console.error('getSsoConfig error:', error);
+      return sendError(res, 'NOT_FOUND', error.message || 'Failed to load SSO configuration', 404);
+    }
+  }
+
+  static async updateSsoConfig(req: Request, res: Response) {
+    try {
+      const orgId = req.params.id;
+      const parsed = updateSsoConfigSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return sendError(res, 'VALIDATION_ERROR', parsed.error.errors[0]?.message || 'Invalid SSO configuration', 400);
+      }
+      const updated = await OrganizationsService.updateSsoConfig(orgId, parsed.data);
+      return sendSuccess(res, updated);
+    } catch (error: any) {
+      console.error('updateSsoConfig error:', error);
+      return sendError(res, 'BAD_REQUEST', error.message || 'Failed to update SSO configuration', 400);
+    }
+  }
+
+  static async generateScimToken(req: Request, res: Response) {
+    try {
+      const orgId = req.params.id;
+      const result = await OrganizationsService.generateScimToken(orgId);
+      return sendSuccess(res, result);
+    } catch (error: any) {
+      console.error('generateScimToken error:', error);
+      return sendError(res, 'INTERNAL_ERROR', error.message || 'Failed to generate SCIM token', 500);
+    }
+  }
+
+  static async revokeScimToken(req: Request, res: Response) {
+    try {
+      const orgId = req.params.id;
+      const result = await OrganizationsService.revokeScimToken(orgId);
+      return sendSuccess(res, result);
+    } catch (error: any) {
+      console.error('revokeScimToken error:', error);
+      return sendError(res, 'INTERNAL_ERROR', error.message || 'Failed to revoke SCIM token', 500);
     }
   }
 }

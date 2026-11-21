@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { AuthController } from './auth.controller';
 import { authenticateJwt } from '../../common/middleware/auth.middleware';
+import { ssoRouter } from './sso/sso.router';
 
 const router = Router();
 
+router.use('/sso', ssoRouter);
 router.post('/register', AuthController.register);
 router.post('/login', AuthController.login);
 router.post('/refresh', AuthController.refresh);

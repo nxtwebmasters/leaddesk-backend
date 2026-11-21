@@ -19,6 +19,7 @@ import { notificationsRouter } from './modules/notifications/notifications.route
 import { searchRouter } from './modules/search/search.router';
 import { reportsRouter } from './modules/reports/reports.router';
 import { organizationsRouter } from './modules/organizations/organizations.router';
+import { scimRouter } from './modules/scim/scim.router';
 import { authenticateJwt } from './common/middleware/auth.middleware';
 import { MeetingsController } from './modules/meetings/meetings.controller';
 
@@ -33,9 +34,12 @@ export function createApp(): Application {
       credentials: true,
     })
   );
-  app.use(express.json({ limit: '10mb' }));
+  app.use(express.json({ limit: '10mb', type: ['application/json', 'application/scim+json'] }));
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
+
+  // RFC 7644 SCIM 2.0 Identity Management Routes
+  app.use('/scim/v2', scimRouter);
 
   // Base API v1 Routes
   app.use('/api/v1/health', healthRouter);

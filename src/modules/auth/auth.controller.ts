@@ -37,18 +37,39 @@ export class AuthController {
     }
 
     const { email, password } = parseResult.data;
-    const result = await AuthService.login(email, password);
+    try {
+      const result = await AuthService.login(email, password);
 
-    if (!result) {
-      return sendError(res, 'INVALID_CREDENTIALS', 'Invalid email or password.', 401);
+      if (!result) {
+        return sendError(res, 'INVALID_CREDENTIALS', 'Invalid email or password.', 401);
+      }
+
+      res.cookie('refreshToken', result.refreshToken, COOKIE_OPTIONS);
+
+      return sendSuccess(res, {
+        user: result.user,
+        accessToken: result.accessToken,
+      });
+    } catch (err: any) {
+      if (err.message?.startsWith('SSO_ENFORCED:')) {
+        const orgName = err.message.replace('SSO_ENFORCED:', '');
+        return sendError(
+          res,
+          'SSO_ENFORCED',
+          `Enterprise Single Sign-On is required for ${orgName}. Please authenticate via your company's SSO portal.`,
+          403
+        );
+      }
+      if (err.message === 'ACCOUNT_DEACTIVATED') {
+        return sendError(
+          res,
+          'ACCOUNT_DEACTIVATED',
+          'Your account has been deactivated. Please contact your Enterprise Administrator.',
+          403
+        );
+      }
+      throw err;
     }
-
-    res.cookie('refreshToken', result.refreshToken, COOKIE_OPTIONS);
-
-    return sendSuccess(res, {
-      user: result.user,
-      accessToken: result.accessToken,
-    });
   }
 
   public static async register(req: Request, res: Response) {

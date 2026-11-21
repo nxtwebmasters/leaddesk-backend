@@ -12,6 +12,24 @@ export class AuthService {
       return null;
     }
 
+    if (!user.isActive) {
+      throw new Error('ACCOUNT_DEACTIVATED');
+    }
+
+    const domain = user.email.split('@')[1];
+    if (domain) {
+      const enforcingOrg = await prisma.organization.findFirst({
+        where: {
+          OR: [{ domain }, { allowedDomains: { has: domain } }],
+          ssoEnabled: true,
+          enforceSso: true,
+        },
+      });
+      if (enforcingOrg) {
+        throw new Error(`SSO_ENFORCED:${enforcingOrg.name}`);
+      }
+    }
+
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
       return null;

@@ -376,4 +376,99 @@ export class OrganizationsService {
 
     return org;
   }
+
+  static async getSsoConfig(orgId: string, hostUrl?: string) {
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        domain: true,
+        ssoEnabled: true,
+        ssoProvider: true,
+        ssoEntityId: true,
+        ssoLoginUrl: true,
+        ssoAcsUrl: true,
+        ssoCert: true,
+        ssoMetadataUrl: true,
+        enforceSso: true,
+        allowedDomains: true,
+        scimEnabled: true,
+        scimApiKey: true,
+      },
+    });
+
+    if (!org) throw new Error('Organization not found');
+
+    const baseHost = hostUrl || 'http://localhost:4000';
+    return {
+      ...org,
+      spEntityId: `${baseHost}/api/v1/auth/sso/metadata/${org.id}`,
+      spAcsUrl: `${baseHost}/api/v1/auth/sso/callback`,
+      spMetadataUrl: `${baseHost}/api/v1/auth/sso/metadata/${org.id}`,
+      scimBaseUrl: `${baseHost}/scim/v2`,
+    };
+  }
+
+  static async updateSsoConfig(orgId: string, input: any) {
+    return prisma.organization.update({
+      where: { id: orgId },
+      data: {
+        ssoEnabled: input.ssoEnabled ?? false,
+        ssoProvider: input.ssoProvider || null,
+        ssoEntityId: input.ssoEntityId || null,
+        ssoLoginUrl: input.ssoLoginUrl || null,
+        ssoAcsUrl: input.ssoAcsUrl || null,
+        ssoCert: input.ssoCert || null,
+        ssoMetadataUrl: input.ssoMetadataUrl || null,
+        enforceSso: input.enforceSso ?? false,
+        allowedDomains: Array.isArray(input.allowedDomains) ? input.allowedDomains : [],
+      },
+      select: {
+        id: true,
+        ssoEnabled: true,
+        ssoProvider: true,
+        ssoEntityId: true,
+        ssoLoginUrl: true,
+        ssoAcsUrl: true,
+        ssoCert: true,
+        ssoMetadataUrl: true,
+        enforceSso: true,
+        allowedDomains: true,
+      },
+    });
+  }
+
+  static async generateScimToken(orgId: string) {
+    const token = `ld_scim_${crypto.randomBytes(24).toString('hex')}`;
+    const org = await prisma.organization.update({
+      where: { id: orgId },
+      data: {
+        scimApiKey: token,
+        scimEnabled: true,
+      },
+      select: {
+        id: true,
+        scimEnabled: true,
+        scimApiKey: true,
+      },
+    });
+    return org;
+  }
+
+  static async revokeScimToken(orgId: string) {
+    const org = await prisma.organization.update({
+      where: { id: orgId },
+      data: {
+        scimApiKey: null,
+        scimEnabled: false,
+      },
+      select: {
+        id: true,
+        scimEnabled: true,
+      },
+    });
+    return org;
+  }
 }

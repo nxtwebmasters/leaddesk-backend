@@ -100,6 +100,8 @@ model User {
   passwordHash   String
   displayName    String
   timezone       String          @default("Asia/Karachi")
+  isActive       Boolean         @default(true)
+  externalId     String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
@@ -497,6 +499,21 @@ model Organization {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
+  // Enterprise SAML 2.0 Single Sign-On
+  ssoEnabled     Boolean         @default(false)
+  ssoProvider    String?         // 'OKTA' | 'AZURE_AD' | 'GOOGLE' | 'GENERIC_SAML'
+  ssoEntityId    String?         // IdP Entity ID / Issuer URI
+  ssoLoginUrl    String?         // IdP Single Sign-On URL
+  ssoAcsUrl      String?         // SP Assertion Consumer Service URL
+  ssoCert        String?         @db.Text // IdP X.509 Public Certificate
+  ssoMetadataUrl String?         // IdP Metadata XML URL
+  enforceSso     Boolean         @default(false)
+  allowedDomains String[]        @default([])
+
+  // Enterprise SCIM 2.0 User Provisioning
+  scimEnabled    Boolean         @default(false)
+  scimApiKey     String?         @unique
+
   workspaces     Workspace[]
   memberships    OrgMembership[]
   invitations    OrgInvitation[]
@@ -553,6 +570,7 @@ model OrgMembership {
   role           OrgRole         @default(MEMBER)
   title          String?
   department     String?
+  isActive       Boolean         @default(true)
   joinedAt       DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
