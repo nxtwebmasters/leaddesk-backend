@@ -123,6 +123,9 @@ model User {
   devexPulses       DevExPulse[]
   auditLogs         AuditLog[]
   complianceExports ComplianceExport[]
+  ledAgendas        OneOnOneAgenda[]    @relation("AgendaLead")
+  memberAgendas     OneOnOneAgenda[]    @relation("AgendaMember")
+  quarterlyReviews  QuarterlyReview[]
 
   @@map("users")
 }
@@ -532,6 +535,9 @@ model Organization {
   auditLogs      AuditLog[]
   retentionPolicies RetentionPolicy[]
   complianceExports ComplianceExport[]
+  semanticMemories  SemanticMemory[]
+  oneOnOneAgendas   OneOnOneAgenda[]
+  quarterlyReviews  QuarterlyReview[]
 
   @@map("organizations")
 }
@@ -984,6 +990,76 @@ model ComplianceExport {
   @@index([orgId, createdAt])
   @@map("compliance_exports")
 }
+
+// ==========================================
+// V3 PHASE 6: AI DECISION INTELLIGENCE & VECTOR MEMORY
+// ==========================================
+
+model SemanticMemory {
+  id           String       @id @default(uuid()) @db.Uuid
+  entityType   String       // "DECISION", "NOTE", "INCIDENT", "MEETING", "RFC"
+  entityId     String?
+  title        String
+  content      String       @db.Text
+  embedding    Float[]      // Normalized vector embedding for cosine similarity search
+  metadata     Json?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  orgId        String       @db.Uuid
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, entityType])
+  @@index([orgId, createdAt])
+  @@map("semantic_memories")
+}
+
+model OneOnOneAgenda {
+  id           String       @id @default(uuid()) @db.Uuid
+  status       String       @default("DRAFT") // "DRAFT", "FINALIZED", "COMPLETED"
+  scheduledFor DateTime?
+  talkingPoints Json        // Array of recommended items { title, category, reason, sourceCitation }
+  actionItems  Json?        // Action items agreed upon
+  notes        String?      @db.Text
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  orgId        String       @db.Uuid
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  leadId       String       @db.Uuid
+  lead         User         @relation("AgendaLead", fields: [leadId], references: [id], onDelete: Cascade)
+
+  memberId     String       @db.Uuid
+  member       User         @relation("AgendaMember", fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, leadId, memberId])
+  @@map("one_on_one_agendas")
+}
+
+model QuarterlyReview {
+  id                  String       @id @default(uuid()) @db.Uuid
+  quarter             String       // e.g. "2026-Q4"
+  title               String
+  executiveSummary    String       @db.Text
+  doraSummary         Json         // DF, LTTC, CFR, MTTR, performance tier
+  okrSummary          Json         // Objectives achieved, completion %, key results
+  reliabilitySummary  Json         // Outages, SEV-1/SEV-2 count, MTTR trends
+  devexSummary        Json         // Morale score, flow hours, solved friction
+  strategicPriorities Json         // Next quarter strategic focus initiatives
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  orgId               String       @db.Uuid
+  organization        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  generatedById       String?      @db.Uuid
+  generatedBy         User?        @relation(fields: [generatedById], references: [id], onDelete: SetNull)
+
+  @@unique([orgId, quarter])
+  @@map("quarterly_reviews")
+}
+
 
 
 
